@@ -120,7 +120,9 @@ func recvUDPMsg(conn *net.UDPConn) {
 		}
 	}
 
-	var strCName string
+	log.Printf("raddr.IP:%s, strIp:%s\n", raddr.IP.String(), strIp)
+
+	var strCName string = ""
 	if raddr.IP.String() == strIp {
 		segments := strings.Split(domain, ".")
 		strCName = segments[0] //domain
@@ -171,6 +173,8 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain strin
 	binary.Write(&buffer, binary.BigEndian, requestQuery)
 	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
 
+	log.Printf("strCName:%s\n", strCName)
+
 	if len(strCName) != 0 {
 		var answer dnsResponseCName
 		answer.QuestionType = 5
@@ -179,6 +183,7 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain strin
 		answer.DataLen = uint16(len(strCName))
 		answer.CName = strCName
 		binary.Write(&buffer, binary.BigEndian, answer)
+		log.Printf("answer:%+v\n", answer)
 	} else {
 		var answer dnsResponse
 		answer.QuestionType = 1
@@ -187,6 +192,7 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain strin
 		answer.DataLen = 4
 		answer.IP = uint32(InetAtoN(strIp))
 		binary.Write(&buffer, binary.BigEndian, answer)
+		log.Printf("answer:%+v\n", answer)
 	}
 
 	//WriteToUDP
