@@ -39,6 +39,14 @@ type dnsResponse struct {
 	IP            uint32
 }
 
+type dnsResponseCName struct {
+	QuestionType  uint16
+	QuestionClass uint16
+	TTL           uint32
+	DataLen       uint16
+	CName         string
+}
+
 func checkError(err error) {
 	if err != nil {
 		fmt.Println("Error: %s", err.Error())
@@ -112,7 +120,13 @@ func recvUDPMsg(conn *net.UDPConn) {
 		}
 	}
 
-	sendRsp(conn, raddr, requestHeader.Id, domain, strIp)
+	var strCName string
+	if raddr.IP.String() == strIp {
+		segments := strings.Split(domain, ".")
+		strCName = segments[0] //domain
+	}
+
+	sendRsp(conn, raddr, requestHeader.Id, domain, strIp, strCName)
 }
 
 func get_domain_ip(domain string) string {
@@ -133,7 +147,7 @@ func get_domain_ip(domain string) string {
 	return v
 }
 
-func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain string, strIp string) {
+func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain string, strIp string, strCName string) {
 
 	requestHeader := dnsHeader{
 		Id:      TransId,
@@ -150,20 +164,30 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain strin
 		QuestionClass: 1,
 	}
 
-	var answer dnsResponse
-	answer.QuestionType = 1
-	answer.QuestionClass = 0x0001
-	answer.TTL = 60
-	answer.DataLen = 4
-	answer.IP = uint32(InetAtoN(strIp))
-
 	var buffer bytes.Buffer
 
 	binary.Write(&buffer, binary.BigEndian, requestHeader)
 	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
 	binary.Write(&buffer, binary.BigEndian, requestQuery)
 	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
-	binary.Write(&buffer, binary.BigEndian, answer)
+
+	if len(strCName) != 0 {
+		var answer dnsResponseCName
+		answer.QuestionType = 5
+		answer.QuestionClass = 0x0001
+		answer.TTL = 60
+		answer.DataLen = uint16(len(strCName))
+		answer.CName = strCName
+		binary.Write(&buffer, binary.BigEndian, answer)
+	} else {
+		var answer dnsResponse
+		answer.QuestionType = 1
+		answer.QuestionClass = 0x0001
+		answer.TTL = 60
+		answer.DataLen = 4
+		answer.IP = uint32(InetAtoN(strIp))
+		binary.Write(&buffer, binary.BigEndian, answer)
+	}
 
 	//WriteToUDP
 	//func (c *UDPConn) WriteToUDP(b []byte, addr *UDPAddr) (int, error)
