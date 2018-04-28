@@ -77,6 +77,16 @@ func ParseDomainName(buffer *bytes.Reader) string {
 	return domain
 }
 
+func reverseString(s string) string {
+	runes := []rune(s)
+
+	for from, to := 0, len(runes)-1; from < to; from, to = from+1, to-1 {
+		runes[from], runes[to] = runes[to], runes[from]
+	}
+
+	return string(runes)
+}
+
 func recvUDPMsg(conn *net.UDPConn) {
 	var buf [1024]byte
 
@@ -110,7 +120,12 @@ func recvUDPMsg(conn *net.UDPConn) {
 
 	strIp = get_domain_ip(domain)
 	if strIp == "" {
-		if domain == "home.ddns.flowheart.cn" {
+		reverseDomain := reverseString(domain)
+		reverseHomeDomain := reverseString("home.ddns.flowheart.cn")
+		reverseDomain = reverseDomain[0:len(reverseDomain)]
+		log.Printf("reverseDomain:%s, reverseHomeDomain:%s\n", reverseDomain, reverseHomeDomain)
+		//if domain == "home.ddns.flowheart.cn" {
+		if reverseDomain == reverseHomeDomain {
 			ns, err := net.LookupHost("heyg.xicp.net")
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Err: %s", err.Error())
