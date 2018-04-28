@@ -122,7 +122,7 @@ func recvUDPMsg(conn *net.UDPConn) {
 	if strIp == "" {
 		reverseDomain := reverseString(domain)
 		reverseHomeDomain := reverseString("home.ddns.flowheart.cn")
-		reverseDomain = reverseDomain[0:len(reverseDomain)]
+		reverseDomain = reverseDomain[0:len(reverseHomeDomain)]
 		log.Printf("reverseDomain:%s, reverseHomeDomain:%s\n", reverseDomain, reverseHomeDomain)
 		//if domain == "home.ddns.flowheart.cn" {
 		if reverseDomain == reverseHomeDomain {
