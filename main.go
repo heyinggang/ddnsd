@@ -100,16 +100,17 @@ func recvUDPMsg(conn *net.UDPConn) {
 
 	strIp := "0.0.0.0"
 
+	base_domain := domain
 	if len(domain) > len("home.ddns.flowheart.cn") {
 		start_pos := len(domain) - len("home.ddns.flowheart.cn")
-		domain = domain[start_pos:]
+		base_domain = domain[start_pos:]
 	}
 
-	fmt.Printf("proccess, domain is %s\n", domain)
+	fmt.Printf("proccess, base_domain is %s\n", base_domain)
 
-	strIp = get_domain_ip(domain)
+	strIp = get_domain_ip(base_domain)
 	if strIp == "" {
-		if domain == "home.ddns.flowheart.cn" {
+		if base_domain == "home.ddns.flowheart.cn" {
 			log.Printf("nslookup begin\n")
 			ns, err := net.LookupHost("heyg.xicp.net")
 			if err != nil {
@@ -120,7 +121,7 @@ func recvUDPMsg(conn *net.UDPConn) {
 			}
 			log.Printf("nslookup end\n")
 		} else {
-			log.Printf("domain:%s\n", domain)
+			log.Printf("base_domain:%s\n", base_domain)
 		}
 	} else {
 		log.Printf("strIp:%s\n", strIp)
