@@ -101,9 +101,15 @@ func recvUDPMsg(conn *net.UDPConn) {
 	strIp := "0.0.0.0"
 
 	base_domain := domain
-	if len(domain) > len("home.ddns.flowheart.cn") {
+	/*if len(domain) > len("home.ddns.flowheart.cn") {
 		start_pos := len(domain) - len("home.ddns.flowheart.cn")
 		base_domain = domain[start_pos:]
+	}*/
+
+	if strings.HasSuffix(domain, "home.ddns.flowheart.cn") {
+		base_domain = "home.ddns.flowheart.cn"
+	} else if strings.HasSuffix(domain, "newblt.com") {
+		base_domain = "home.ddns.flowheart.cn"
 	}
 
 	fmt.Printf("proccess, base_domain is %s\n", base_domain)
