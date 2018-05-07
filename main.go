@@ -110,13 +110,15 @@ func recvUDPMsg(conn *net.UDPConn) {
 	strIp = get_domain_ip(domain)
 	if strIp == "" {
 		if domain == "home.ddns.flowheart.cn" {
+			log.Printf("nslookup begin\n")
 			ns, err := net.LookupHost("heyg.xicp.net")
 			if err != nil {
-				log.Println(err)
+				log.Printf("nslookup ret::%+v\n", err)
 				return
 			} else {
 				strIp = ns[0]
 			}
+			log.Printf("nslookup end\n")
 		} else {
 			log.Printf("domain:%s\n", domain)
 		}
@@ -124,20 +126,21 @@ func recvUDPMsg(conn *net.UDPConn) {
 		log.Printf("strIp:%s\n", strIp)
 	}
 
+	log.Printf("sendRsp,domain:%s,strIp:%s\n", domain, strIp)
 	sendRsp(conn, raddr, requestHeader.Id, domain, strIp)
 }
 
 func get_domain_ip(domain string) string {
 	c, err := redis.Dial("tcp", "127.0.0.1:6379")
 	if err != nil {
-		log.Println("redis dial : %+v\n", err)
+		log.Printf("redis dial : %+v\n", err)
 		return ""
 	}
 	defer c.Close()
 
 	v, err := redis.String(c.Do("GET", domain))
 	if err != nil {
-		log.Println("redis get : %+v\n", err)
+		log.Printf("redis get : %+v\n", err)
 		return ""
 	}
 	log.Println(v)
