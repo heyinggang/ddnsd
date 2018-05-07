@@ -112,10 +112,11 @@ func recvUDPMsg(conn *net.UDPConn) {
 		if domain == "home.ddns.flowheart.cn" {
 			ns, err := net.LookupHost("heyg.xicp.net")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Err: %s", err.Error())
+				log.Println(err)
 				return
+			} else {
+				strIp = ns[0]
 			}
-			strIp = ns[0]
 		}
 	}
 
