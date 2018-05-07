@@ -117,7 +117,11 @@ func recvUDPMsg(conn *net.UDPConn) {
 			} else {
 				strIp = ns[0]
 			}
+		} else {
+			log.Printf("domain:%s\n", domain)
 		}
+	} else {
+		log.Printf("strIp:%s\n", strIp)
 	}
 
 	sendRsp(conn, raddr, requestHeader.Id, domain, strIp)
@@ -126,14 +130,14 @@ func recvUDPMsg(conn *net.UDPConn) {
 func get_domain_ip(domain string) string {
 	c, err := redis.Dial("tcp", "127.0.0.1:6379")
 	if err != nil {
-		log.Println(err)
+		log.Println("redis dial : %+v\n", err)
 		return ""
 	}
 	defer c.Close()
 
 	v, err := redis.String(c.Do("GET", domain))
 	if err != nil {
-		log.Println(err)
+		log.Println("redis get : %+v\n", err)
 		return ""
 	}
 	log.Println(v)
