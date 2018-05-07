@@ -39,14 +39,6 @@ type dnsResponse struct {
 	IP            uint32
 }
 
-type dnsResponseCName struct {
-	QuestionType  uint16
-	QuestionClass uint16
-	TTL           uint32
-	DataLen       uint16
-	CName         string
-}
-
 func checkError(err error) {
 	if err != nil {
 		fmt.Println("Error: %s", err.Error())
@@ -75,16 +67,6 @@ func ParseDomainName(buffer *bytes.Reader) string {
 	}
 
 	return domain
-}
-
-func reverseString(s string) string {
-	runes := []rune(s)
-
-	for from, to := 0, len(runes)-1; from < to; from, to = from+1, to-1 {
-		runes[from], runes[to] = runes[to], runes[from]
-	}
-
-	return string(runes)
 }
 
 func recvUDPMsg(conn *net.UDPConn) {
@@ -118,14 +100,16 @@ func recvUDPMsg(conn *net.UDPConn) {
 
 	strIp := "0.0.0.0"
 
+	if len(domain) > len("home.ddns.flowheart.cn") {
+		start_pos := len(domain) - len("home.ddns.flowheart.cn")
+		domain = domain[start_pos:]
+	}
+
+	fmt.Printf("proccess, domain is %s\n", domain)
+
 	strIp = get_domain_ip(domain)
 	if strIp == "" {
-		reverseDomain := reverseString(domain)
-		reverseHomeDomain := reverseString("home.ddns.flowheart.cn")
-		reverseDomain = reverseDomain[0:len(reverseHomeDomain)]
-		log.Printf("reverseDomain:%s, reverseHomeDomain:%s\n", reverseDomain, reverseHomeDomain)
-		//if domain == "home.ddns.flowheart.cn" {
-		if reverseDomain == reverseHomeDomain {
+		if domain == "home.ddns.flowheart.cn" {
 			ns, err := net.LookupHost("heyg.xicp.net")
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Err: %s", err.Error())
@@ -135,15 +119,7 @@ func recvUDPMsg(conn *net.UDPConn) {
 		}
 	}
 
-	log.Printf("raddr.IP:%s, strIp:%s\n", raddr.IP.String(), strIp)
-
-	var strCName string = ""
-	if raddr.IP.String() == strIp {
-		segments := strings.Split(domain, ".")
-		strCName = segments[0] //domain
-	}
-
-	sendRsp(conn, raddr, requestHeader.Id, domain, strIp, strCName)
+	sendRsp(conn, raddr, requestHeader.Id, domain, strIp)
 }
 
 func get_domain_ip(domain string) string {
@@ -164,7 +140,7 @@ func get_domain_ip(domain string) string {
 	return v
 }
 
-func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain string, strIp string, strCName string) {
+func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain string, strIp string) {
 
 	requestHeader := dnsHeader{
 		Id:      TransId,
@@ -181,34 +157,20 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain strin
 		QuestionClass: 1,
 	}
 
+	var answer dnsResponse
+	answer.QuestionType = 1
+	answer.QuestionClass = 0x0001
+	answer.TTL = 60
+	answer.DataLen = 4
+	answer.IP = uint32(InetAtoN(strIp))
+
 	var buffer bytes.Buffer
 
 	binary.Write(&buffer, binary.BigEndian, requestHeader)
 	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
 	binary.Write(&buffer, binary.BigEndian, requestQuery)
 	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
-
-	log.Printf("strCName:%s\n", strCName)
-
-	if len(strCName) != 0 {
-		var answer dnsResponseCName
-		answer.QuestionType = 5
-		answer.QuestionClass = 0x0001
-		answer.TTL = 60
-		answer.DataLen = uint16(len(strCName))
-		answer.CName = strCName
-		binary.Write(&buffer, binary.BigEndian, answer)
-		log.Printf("answer:%+v\n", answer)
-	} else {
-		var answer dnsResponse
-		answer.QuestionType = 1
-		answer.QuestionClass = 0x0001
-		answer.TTL = 60
-		answer.DataLen = 4
-		answer.IP = uint32(InetAtoN(strIp))
-		binary.Write(&buffer, binary.BigEndian, answer)
-		log.Printf("answer:%+v\n", answer)
-	}
+	binary.Write(&buffer, binary.BigEndian, answer)
 
 	//WriteToUDP
 	//func (c *UDPConn) WriteToUDP(b []byte, addr *UDPAddr) (int, error)
