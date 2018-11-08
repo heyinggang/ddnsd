@@ -12,11 +12,12 @@ import (
 	//	"strings"
 	//	"time"
 
-    "time"
-    "context"
+	"context"
+	"time"
+
 	"github.com/gomodule/redigo/redis"
-    //"github.com/coreos/etcd/clientv3"
-    "go.etcd.io/etcd/clientv3"
+	//"github.com/coreos/etcd/clientv3"
+	"go.etcd.io/etcd/clientv3"
 )
 
 type dnsHeader struct {
@@ -82,7 +83,7 @@ func recvUDPMsg(conn *net.UDPConn) {
 	}
 
 	requestHeader := dnsHeader{
-		Id:     0x0010,
+		Id:      0x0010,
 		Qdcount: 1,
 		Ancount: 0,
 		Nscount: 0,
@@ -123,7 +124,7 @@ func recvUDPMsg(conn *net.UDPConn) {
 	}
 
 	log.Printf("sendRsp,domain:%s,strIp:%s\n", domain, strIp)
-	sendRsp(conn, raddr, requestHeader.Id, domain, strIp)
+	sendRsp(conn, raddr, requestHeader.Id, requestQuery.QuestionType, domain, strIp)
 }
 
 func get_domain_ip_redis(domain string) string {
@@ -146,38 +147,38 @@ func get_domain_ip_redis(domain string) string {
 
 func get_domain_ip_etcd(domain string) string {
 
-    cli, err := clientv3.New(clientv3.Config{
-        Endpoints:   []string{"127.0.0.1:2379", "119.28.2.151:2379", "119.28.228.186:2379", "111.230.210.236:2379"},
-        DialTimeout: 5 * time.Second,
-    })  
-    if err != nil {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{"127.0.0.1:2379", "119.28.2.151:2379", "119.28.228.186:2379", "111.230.210.236:2379"},
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
 		log.Printf("etcd dial : %+v\n", err)
 		return ""
 	}
 	defer cli.Close()
 
-    checkError(err)
+	checkError(err)
 
-    kv := clientv3.NewKV(cli)
+	kv := clientv3.NewKV(cli)
 
-    key1 := "/ddns/" + domain
+	key1 := "/ddns/" + domain
 
-    log.Print(key1)
-    getResp, err2 := kv.Get(context.TODO(), key1)
-    checkError(err2)
+	log.Print(key1)
+	getResp, err2 := kv.Get(context.TODO(), key1)
+	checkError(err2)
 
-    log.Print(getResp.Kvs)
+	log.Print(getResp.Kvs)
 
-    var strIp string
-    for _, ev := range getResp.Kvs {
-        fmt.Printf("%s : %s\n", ev.Key, ev.Value)
-        strIp = string(ev.Value)
-    }   
+	var strIp string
+	for _, ev := range getResp.Kvs {
+		fmt.Printf("%s : %s\n", ev.Key, ev.Value)
+		strIp = string(ev.Value)
+	}
 
-    return strIp//putResp//v
+	return strIp //putResp//v
 }
 
-func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain string, strIp string) {
+func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, QuestionType uint16, domain string, strIp string) {
 
 	requestHeader := dnsHeader{
 		Id:      TransId,
@@ -195,7 +196,7 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain strin
 	}
 
 	var answer dnsResponse
-	answer.QuestionType = 1
+	answer.QuestionType = QuestionType
 	answer.QuestionClass = 0x0001
 	answer.TTL = 60
 	answer.DataLen = 4
@@ -207,7 +208,9 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain strin
 	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
 	binary.Write(&buffer, binary.BigEndian, requestQuery)
 	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
-	binary.Write(&buffer, binary.BigEndian, answer)
+	if answer.QuestionType == 1 {
+		binary.Write(&buffer, binary.BigEndian, answer)
+	}
 
 	//WriteToUDP
 	//func (c *UDPConn) WriteToUDP(b []byte, addr *UDPAddr) (int, error)
@@ -215,49 +218,6 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain strin
 	checkError(err)
 }
 
-/*
-func Send(dnsServer, domain string) ([]byte, int, time.Duration) {
-	requestHeader := dnsHeader{
-		Id:      0x0010,
-		Qdcount: 1,
-		Ancount: 1,
-		Nscount: 0,
-		Arcount: 0,
-	}
-	requestHeader.SetFlag(0, 0, 0, 0, 1, 0, 0)
-
-	requestQuery := dnsQuery{
-		QuestionType:  1,
-		QuestionClass: 1,
-	}
-
-	var (
-		conn   net.Conn
-		err    error
-		buffer bytes.Buffer
-	)
-
-	if conn, err = net.Dial("udp", dnsServer); err != nil {
-		fmt.Println(err.Error())
-		return make([]byte, 0), 0, 0
-	}
-	defer conn.Close()
-
-	binary.Write(&buffer, binary.BigEndian, requestHeader)
-	binary.Write(&buffer, binary.BigEndian, ParseDomainName(domain))
-	binary.Write(&buffer, binary.BigEndian, requestQuery)
-
-	buf := make([]byte, 1024)
-	t1 := time.Now()
-	if _, err := conn.Write(buffer.Bytes()); err != nil {
-		fmt.Println(err.Error())
-		return make([]byte, 0), 0, 0
-	}
-	length, err := conn.Read(buf)
-	t := time.Now().Sub(t1)
-	return buf, length, t
-}
-*/
 func InetAtoN(ip string) int64 {
 	ret := big.NewInt(0)
 	ret.SetBytes(net.ParseIP(ip).To4())
