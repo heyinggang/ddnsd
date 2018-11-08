@@ -206,9 +206,8 @@ func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, QuestionType
 
 	binary.Write(&buffer, binary.BigEndian, requestHeader)
 	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
-	binary.Write(&buffer, binary.BigEndian, requestQuery)
-	binary.Write(&buffer, binary.BigEndian, WriteDomainName(domain))
 	if answer.QuestionType == 1 {
+		binary.Write(&buffer, binary.BigEndian, requestQuery)
 		binary.Write(&buffer, binary.BigEndian, answer)
 	}
 
