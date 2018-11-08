@@ -12,7 +12,11 @@ import (
 	//	"strings"
 	//	"time"
 
+    "time"
+    "context"
 	"github.com/gomodule/redigo/redis"
+    //"github.com/coreos/etcd/clientv3"
+    "go.etcd.io/etcd/clientv3"
 )
 
 type dnsHeader struct {
@@ -78,7 +82,7 @@ func recvUDPMsg(conn *net.UDPConn) {
 	}
 
 	requestHeader := dnsHeader{
-		Id:      0x0010,
+		Id:     0x0010,
 		Qdcount: 1,
 		Ancount: 0,
 		Nscount: 0,
@@ -98,25 +102,10 @@ func recvUDPMsg(conn *net.UDPConn) {
 
 	fmt.Printf("query req n:%d, domain is %s\n", n, domain)
 
-	strIp := "0.0.0.0"
-
-	base_domain := domain
-	/*if len(domain) > len("home.ddns.flowheart.cn") {
-		start_pos := len(domain) - len("home.ddns.flowheart.cn")
-		base_domain = domain[start_pos:]
-	}*/
-
-	if strings.HasSuffix(domain, "home.ddns.flowheart.cn") {
-		base_domain = "home.ddns.flowheart.cn"
-	} else if strings.HasSuffix(domain, "newblt.com") {
-		base_domain = "home.ddns.flowheart.cn"
-	}
-
-	fmt.Printf("proccess, base_domain is %s\n", base_domain)
-
-	strIp = get_domain_ip(base_domain)
+	///strIp := get_domain_ip_etcd(domain)
+	strIp := get_domain_ip_redis(domain)
 	if strIp == "" {
-		if base_domain == "home.ddns.flowheart.cn" {
+		if domain == "s1.newblt.com" {
 			log.Printf("nslookup begin\n")
 			ns, err := net.LookupHost("heyg.xicp.net")
 			if err != nil {
@@ -127,7 +116,7 @@ func recvUDPMsg(conn *net.UDPConn) {
 			}
 			log.Printf("nslookup end\n")
 		} else {
-			log.Printf("base_domain:%s\n", base_domain)
+			log.Printf("domain:%s\n", domain)
 		}
 	} else {
 		log.Printf("strIp:%s\n", strIp)
@@ -137,7 +126,7 @@ func recvUDPMsg(conn *net.UDPConn) {
 	sendRsp(conn, raddr, requestHeader.Id, domain, strIp)
 }
 
-func get_domain_ip(domain string) string {
+func get_domain_ip_redis(domain string) string {
 	c, err := redis.Dial("tcp", "127.0.0.1:6379")
 	if err != nil {
 		log.Printf("redis dial : %+v\n", err)
@@ -153,6 +142,39 @@ func get_domain_ip(domain string) string {
 	log.Println(v)
 
 	return v
+}
+
+func get_domain_ip_etcd(domain string) string {
+
+    cli, err := clientv3.New(clientv3.Config{
+        Endpoints:   []string{"127.0.0.1:2379", "119.28.2.151:2379", "119.28.228.186:2379", "111.230.210.236:2379"},
+        DialTimeout: 5 * time.Second,
+    })  
+    if err != nil {
+		log.Printf("etcd dial : %+v\n", err)
+		return ""
+	}
+	defer cli.Close()
+
+    checkError(err)
+
+    kv := clientv3.NewKV(cli)
+
+    key1 := "/ddns/" + domain
+
+    log.Print(key1)
+    getResp, err2 := kv.Get(context.TODO(), key1)
+    checkError(err2)
+
+    log.Print(getResp.Kvs)
+
+    var strIp string
+    for _, ev := range getResp.Kvs {
+        fmt.Printf("%s : %s\n", ev.Key, ev.Value)
+        strIp = string(ev.Value)
+    }   
+
+    return strIp//putResp//v
 }
 
 func sendRsp(conn *net.UDPConn, raddr *net.UDPAddr, TransId uint16, domain string, strIp string) {
